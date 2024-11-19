@@ -1,24 +1,39 @@
-use rand::prelude::*;
-
-mod numbers;
-
-pub fn generate_random_number() {
-    let mut rng = StdRng::from_entropy();
-
-    for _ in 0..10 {
-        println!("{}", rng.next_u64());
-    }
-}
+pub mod crypto;
+mod errors;
+pub mod keygen;
+mod util;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use numbers::prime_gen::generate_candidate_prime;
+    use crate::keygen::*;
+    use num::BigUint;
+    use rand::rngs::StdRng;
+    use rand::SeedableRng;
 
     #[test]
-    fn gen_prime() {
-        let mut rng = StdRng::from_entropy();
+    fn generate_rsa_keypair() {
+        let rng = StdRng::from_entropy();
 
-        println!("{}", generate_candidate_prime(&mut rng, 5));
+        let options = RsaOptions::default()
+            .with_rng(rng)
+            .create_keypair()
+            .inspect_err(|err| println!("{}", err));
+
+        assert!(options.is_ok());
+        let kp = options.unwrap();
+
+        let pk = kp.public_key;
+        let sk = kp.private_key;
+
+        let p1 = &sk.prime1 - 1u32;
+        let q1 = &sk.prime2 - 1u32;
+
+        assert_eq!(&pk.public_exponent, &sk.public_exponent);
+        assert_eq!(&pk.modulus, &sk.modulus);
+
+        let one = BigUint::ZERO + 1u32;
+
+        assert_eq!((&pk.public_exponent * &sk.exponent1) % &p1, one);
+        assert_eq!((&pk.public_exponent * &sk.exponent2) % &q1, one);
     }
 }
