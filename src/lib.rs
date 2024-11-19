@@ -12,7 +12,7 @@ mod tests {
 
     #[test]
     fn generate_rsa_keypair_random() {
-        let rng = StdRng::from_entropy();
+        let rng: Box<dyn RsaCsprng> = Box::new(StdRng::from_entropy());
 
         let options = KeyPairBuilder::default()
             .with_rng(rng)
@@ -39,11 +39,11 @@ mod tests {
 
     #[test]
     fn generate_rsa_keypair_local() {
-        let rng = StdRng::from_entropy();
+        let rng = Box::new(StdRng::from_entropy());
 
         let options = KeyPairBuilder::default()
             .with_rng(rng)
-            .with_local_generation()
+            .with_prime_gen_method(PrimeGenMethod::RandomizedLocalSearch)
             .create_keypair()
             .inspect_err(|err| println!("{}", err));
 

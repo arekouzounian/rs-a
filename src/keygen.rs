@@ -1,7 +1,6 @@
 //! Contains utilities for generating RSA keys.
 //! Can generate keypairs using random number generation and primality testing, as well as
 //! generating private keys from a given public key
-use std::borrow::BorrowMut;
 
 use num::{BigUint, Integer};
 use num_bigint::RandBigInt;
@@ -13,11 +12,18 @@ use crate::util::{carmichael_totient, generate_candidate_prime, generate_prime_l
 pub const RSA_PRIME_NUMBER_BIT_LENGTH: u64 = 1024;
 pub const RSA_MODULUS_BIT_LENGTH: usize = 2048;
 
-pub const RSA_VERSION: RsaVersion = RsaVersion(0);
+pub const RSA_VERSION: u8 = 0;
 
 pub const DEFAULT_MR_ITERATIONS: usize = 1;
 
-pub struct RsaVersion(u8);
+// pub enum PrimeGenMethod<F>
+// where
+//     F: Fn(&mut Box<dyn RsaCsprng>) -> BigUint,
+pub enum PrimeGenMethod {
+    RandomGeneration,
+    RandomizedLocalSearch,
+    // Custom(F),
+}
 
 pub trait RsaCsprng: CryptoRng + RandBigInt {}
 impl<T: CryptoRng + RandBigInt> RsaCsprng for T {}
@@ -26,8 +32,8 @@ pub struct KeyPairBuilder {
     exponent: Option<BigUint>,
     modulus: Option<(BigUint, BigUint)>,
     rng: Option<Box<dyn RsaCsprng>>,
-    mr_iterations: usize,
-    local_generation: bool,
+    miller_rabin_iterations: usize,
+    prime_generation_method: PrimeGenMethod,
 }
 
 impl Default for KeyPairBuilder {
@@ -36,8 +42,8 @@ impl Default for KeyPairBuilder {
             exponent: None,
             modulus: None,
             rng: None,
-            mr_iterations: DEFAULT_MR_ITERATIONS,
-            local_generation: false,
+            miller_rabin_iterations: DEFAULT_MR_ITERATIONS,
+            prime_generation_method: PrimeGenMethod::RandomGeneration,
         }
     }
 }
@@ -51,43 +57,39 @@ impl KeyPairBuilder {
         self.modulus = Some((p, q));
         self
     }
-    pub fn with_rng<R>(&mut self, rng: R) -> &mut Self
-    where
-        R: RsaCsprng + 'static,
-    {
-        self.rng = Some(Box::new(rng));
+    pub fn with_rng(&mut self, rng: Box<dyn RsaCsprng>) -> &mut Self {
+        self.rng = Some(rng);
         self
     }
     pub fn with_iterations(&mut self, iterations: usize) -> &mut Self {
-        self.mr_iterations = iterations;
+        self.miller_rabin_iterations = iterations;
         self
     }
-    pub fn with_local_generation(&mut self) -> &mut Self {
-        self.local_generation = true;
+    pub fn with_prime_gen_method(&mut self, m: PrimeGenMethod) -> &mut Self {
+        self.prime_generation_method = m;
         self
     }
 
     /// Consumes fields
     pub fn create_keypair(&mut self) -> Result<KeyPair, RsaOptionsError> {
         let mut rng = self.rng.take().unwrap_or(Box::new(StdRng::from_entropy()));
-        let mr_iterations = self.mr_iterations;
+        let mr_iterations = self.miller_rabin_iterations;
 
         dbg!("Generating modulus");
-        let modulus = self.modulus.take().unwrap_or_else(|| {
-            let p;
-            let q;
-            dbg!("Generating first prime...");
-
-            if self.local_generation {
-                p = generate_prime_local_search(&mut rng, mr_iterations);
-                q = generate_prime_local_search(&mut rng, mr_iterations);
-            } else {
-                p = generate_candidate_prime(&mut rng, mr_iterations);
-                q = generate_candidate_prime(&mut rng, mr_iterations);
-            }
-
-            (p, q)
-        });
+        let modulus = self
+            .modulus
+            .take()
+            .unwrap_or_else(|| match &self.prime_generation_method {
+                PrimeGenMethod::RandomGeneration => (
+                    generate_candidate_prime(&mut rng, mr_iterations),
+                    generate_candidate_prime(&mut rng, mr_iterations),
+                ),
+                PrimeGenMethod::RandomizedLocalSearch => (
+                    generate_prime_local_search(&mut rng, mr_iterations),
+                    generate_prime_local_search(&mut rng, mr_iterations),
+                ),
+                // PrimeGenMethod::Custom(f) => (f(&mut rng), f(&mut rng)),
+            });
 
         dbg!("Computing totient...");
         let lambda = carmichael_totient(&modulus.0, &modulus.1);
@@ -145,7 +147,7 @@ pub struct RsaPublicKey {
 }
 /// [See source](https://datatracker.ietf.org/doc/html/rfc3447#appendix-A)
 pub struct RsaPrivateKey {
-    pub version: RsaVersion,
+    pub version: u8,
     pub modulus: BigUint,
     pub public_exponent: BigUint,
     pub private_exponent: BigUint,
@@ -179,10 +181,12 @@ impl RsaPrivateKey {
 
         let dp = d.modpow(&one, &p1);
         let dq = d.modpow(&one, &q1);
-        let qinv = q.modinv(&p).ok_or(RsaOptionsError::new(format!(
-            "Unable to compute modular inverse of {} with respect to {}.",
-            q, p
-        )))?;
+        let qinv = q.modinv(&p).ok_or_else(|| {
+            RsaOptionsError::new(format!(
+                "Unable to compute modular inverse of {} with respect to {}.",
+                q, p
+            ))
+        })?;
 
         Ok(Self {
             version: RSA_VERSION,

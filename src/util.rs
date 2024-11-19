@@ -1,7 +1,5 @@
 //! Utility functions
 use num::{BigUint, Integer};
-use num_bigint::RandBigInt;
-use rand::prelude::*;
 
 use crate::keygen::{RsaCsprng, RSA_PRIME_NUMBER_BIT_LENGTH};
 
