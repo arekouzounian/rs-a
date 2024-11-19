@@ -26,6 +26,21 @@ pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usi
     num
 }
 
+pub fn generate_prime_local_search(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
+    let mut num = generate_random_odd_big_uint(rng);
+
+    let mut it = 1;
+    while !(miller_rabin_is_prime(rng, &num, mr_iterations)) {
+        num.inc();
+        num.inc();
+        it += 1;
+    }
+
+    dbg!("Total increments necessary: {}", it);
+
+    num
+}
+
 /// Generates a large, odd integer
 pub fn generate_random_odd_big_uint(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
     let x = rng.gen_biguint(RSA_PRIME_NUMBER_BIT_LENGTH);
@@ -71,7 +86,7 @@ fn miller_rabin_is_prime(
 
     for _ in 0..iterations {
         let a = rng.gen_biguint_range(&two, &p_minus_one);
-        if test_witness(&a, &prime_candidate, u, &r) {
+        if test_witness(&a, &prime_candidate, &u, &r) {
             return false;
         }
     }
@@ -79,11 +94,11 @@ fn miller_rabin_is_prime(
     true
 }
 
-/// a: potential witness \
-/// p: prime candidate \
-/// r, u: values such that p - 1 = 2^u * r \
+/// `a`: potential witness \
+/// `p`: prime candidate \
+/// `r, u`: values such that `p - 1` = `2^u * r` \
 /// Returns true if a is a valid witness, false otherwise
-fn test_witness(a: &BigUint, p: &BigUint, u: u32, r: &BigUint) -> bool {
+fn test_witness(a: &BigUint, p: &BigUint, u: &u32, r: &BigUint) -> bool {
     let mut z: BigUint = a.modpow(r, p);
 
     let two: BigUint = BigUint::ZERO + 2u32;
@@ -93,7 +108,7 @@ fn test_witness(a: &BigUint, p: &BigUint, u: u32, r: &BigUint) -> bool {
         return false;
     }
 
-    for i in 0..u {
+    for i in 0..*u {
         let exp = two.pow(i) * r;
         z = z.modpow(&exp, p);
 

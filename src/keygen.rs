@@ -8,7 +8,7 @@ use num_bigint::RandBigInt;
 use rand::{rngs::StdRng, CryptoRng, SeedableRng};
 
 use crate::errors::RsaOptionsError;
-use crate::util::{carmichael_totient, generate_candidate_prime};
+use crate::util::{carmichael_totient, generate_candidate_prime, generate_prime_local_search};
 
 pub const RSA_PRIME_NUMBER_BIT_LENGTH: u64 = 1024;
 pub const RSA_MODULUS_BIT_LENGTH: usize = 2048;
@@ -22,25 +22,27 @@ pub struct RsaVersion(u8);
 pub trait RsaCsprng: CryptoRng + RandBigInt {}
 impl<T: CryptoRng + RandBigInt> RsaCsprng for T {}
 
-pub struct RsaOptions {
+pub struct KeyPairBuilder {
     exponent: Option<BigUint>,
     modulus: Option<(BigUint, BigUint)>,
     rng: Option<Box<dyn RsaCsprng>>,
     mr_iterations: usize,
+    local_generation: bool,
 }
 
-impl Default for RsaOptions {
+impl Default for KeyPairBuilder {
     fn default() -> Self {
         Self {
             exponent: None,
             modulus: None,
             rng: None,
             mr_iterations: DEFAULT_MR_ITERATIONS,
+            local_generation: false,
         }
     }
 }
 
-impl RsaOptions {
+impl KeyPairBuilder {
     pub fn with_exponent(&mut self, e: BigUint) -> &mut Self {
         self.exponent = Some(e);
         self
@@ -60,6 +62,10 @@ impl RsaOptions {
         self.mr_iterations = iterations;
         self
     }
+    pub fn with_local_generation(&mut self) -> &mut Self {
+        self.local_generation = true;
+        self
+    }
 
     /// Consumes fields
     pub fn create_keypair(&mut self) -> Result<KeyPair, RsaOptionsError> {
@@ -68,10 +74,17 @@ impl RsaOptions {
 
         dbg!("Generating modulus");
         let modulus = self.modulus.take().unwrap_or_else(|| {
+            let p;
+            let q;
             dbg!("Generating first prime...");
-            let p = generate_candidate_prime(&mut rng, mr_iterations);
-            dbg!("Generating second prime...");
-            let q = generate_candidate_prime(&mut rng, mr_iterations);
+
+            if self.local_generation {
+                p = generate_prime_local_search(&mut rng, mr_iterations);
+                q = generate_prime_local_search(&mut rng, mr_iterations);
+            } else {
+                p = generate_candidate_prime(&mut rng, mr_iterations);
+                q = generate_candidate_prime(&mut rng, mr_iterations);
+            }
 
             (p, q)
         });
