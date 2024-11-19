@@ -34,6 +34,7 @@ pub struct KeyPairBuilder {
     rng: Option<Box<dyn RsaCsprng>>,
     miller_rabin_iterations: usize,
     prime_generation_method: PrimeGenMethod,
+    // private key representation
 }
 
 impl Default for KeyPairBuilder {

@@ -5,8 +5,9 @@ pub mod util;
 
 #[cfg(test)]
 mod tests {
+    use crate::crypto::*;
     use crate::keygen::*;
-    use num::BigUint;
+    use num::{BigUint, FromPrimitive};
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
@@ -63,5 +64,19 @@ mod tests {
 
         assert_eq!((&pk.public_exponent * &sk.exponent1) % &p1, one);
         assert_eq!((&pk.public_exponent * &sk.exponent2) % &q1, one);
+
+        let m = BigUint::from_u32(100).unwrap();
+
+        let cipher_res = pk.crypt(&m);
+        assert!(cipher_res.is_ok());
+
+        let c = cipher_res.unwrap();
+
+        let decrypt_res = sk.crypt(&c);
+        assert!(decrypt_res.is_ok());
+
+        let d = decrypt_res.unwrap();
+
+        assert_eq!(m, d);
     }
 }
