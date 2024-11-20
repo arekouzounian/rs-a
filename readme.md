@@ -1,4 +1,6 @@
 # rs-a 
+![rust tests badge](https://github.com/arekouzounian/rs-a/actions/workflows/rust.yml/badge.svg)
+
 An implementation of RSA, as specified in [RFC 8017](https://www.rfc-editor.org/rfc/rfc8017), using Rust.
 
 ## Intended Usage
