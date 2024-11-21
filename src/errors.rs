@@ -1,3 +1,7 @@
+//! # Error Handling
+//! This crate will define various errors that are generated throughout the process of
+//! key generation, encryption, decryption, serialization, and more.
+
 use core::fmt::{self, Display};
 use std::error;
 

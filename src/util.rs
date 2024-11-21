@@ -1,9 +1,10 @@
 //! Utility functions
+
 use num::{BigUint, Integer};
 
 use crate::keygen::{RsaCsprng, RSA_PRIME_NUMBER_BIT_LENGTH};
 
-/// Generate a candidate prime (see `keygen.rs` for bit length)
+/// Generates a candidate prime (see `keygen.rs` for bit length) by repeated random drawing.
 /// Applies the Miller-Rabin Primality test `mr_iterations` times to test for primality.
 ///
 /// `rng`: The CSPRNG used to generate primes
@@ -24,6 +25,14 @@ pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usi
     num
 }
 
+/// Generates a candidate prime (see `keygen.rs` for bit length) by an initial random
+/// drawing, and then continuous incrementation (local search).
+/// Applies the Miller-Rabin Primality test `mr_iterations` times to test for primality.
+///
+/// `rng`: The CSPRNG used to generate primes
+///
+/// `mr_iterations`: The number of miller-rabin primality test iterations to conduct,
+/// default 1.
 pub fn generate_prime_local_search(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
     let mut num = generate_random_odd_big_uint(rng);
 
@@ -40,7 +49,7 @@ pub fn generate_prime_local_search(rng: &mut Box<dyn RsaCsprng>, mr_iterations: 
 }
 
 /// Generates a large, odd integer
-pub fn generate_random_odd_big_uint(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
+fn generate_random_odd_big_uint(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
     let x = rng.gen_biguint(RSA_PRIME_NUMBER_BIT_LENGTH);
 
     if x.bit(0) == true {
@@ -50,6 +59,8 @@ pub fn generate_random_odd_big_uint(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
     x - 1u32
 }
 
+/// Computes the Carmichael Totient function `lambda(n)` for a given two-prime RSA modulus,
+/// represented by primes `p, q`.
 pub fn carmichael_totient(p: &BigUint, q: &BigUint) -> BigUint {
     (p - 1u32).lcm(&(q - 1u32))
 }
@@ -57,7 +68,8 @@ pub fn carmichael_totient(p: &BigUint, q: &BigUint) -> BigUint {
 // Miller-Rabin Primality Test
 // A candidate prime p is an integer that we want to test for primality.
 // A successful candidate will be an odd integer.
-// Every odd prime can be decomposed into the form (p - 1) = 2^u * r, where r is an odd integer.
+// Every odd prime can be decomposed into the form (p - 1) = 2^u * r,
+// where r is an odd integer.
 fn miller_rabin_is_prime(
     rng: &mut Box<dyn RsaCsprng>,
     prime_candidate: &BigUint,
