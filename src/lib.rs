@@ -103,6 +103,24 @@ mod tests {
 
     #[test]
     fn test_serial() {
-        read_ssh_public_key(Path::new("/Users/arekouzounian/.ssh/id_rsa.pub")).expect("failed");
+        let res = read_ssh_public_key(Path::new("/Users/arekouzounian/.ssh/id_rsa.pub"));
+        assert!(res.is_ok());
+
+        let kp = res.unwrap();
+
+        println!("exponent: {}", kp.0);
+        println!("modulus: {}", kp.1);
+
+        let ret = read_private_file(Path::new("/Users/arekouzounian/.ssh/id_rsa"));
+        assert!(ret.is_ok());
+
+        // let (sk, pk) = ret.unwrap();
+
+        // println!("modulus: {}", pk);
+        // println!("exponent: {}", sk);
+
+        // let tup = res.unwrap();
+
+        // let options = RsaPublicKey::new(tup.0, tup.1);
     }
 }
