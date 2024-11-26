@@ -204,6 +204,30 @@ impl RsaPublicKey {
 }
 
 impl RsaPrivateKey {
+    pub fn new(
+        version: u8,
+        modulus: BigUint,
+        public_exponent: BigUint,
+        private_exponent: BigUint,
+        prime1: BigUint,
+        prime2: BigUint,
+        exponent1: BigUint,
+        exponent2: BigUint,
+        coefficient: BigUint,
+    ) -> Self {
+        Self {
+            version,
+            modulus,
+            public_exponent,
+            private_exponent,
+            prime1,
+            prime2,
+            exponent1,
+            exponent2,
+            coefficient,
+        }
+    }
+
     fn with_values(
         n: BigUint,
         e: BigUint,
