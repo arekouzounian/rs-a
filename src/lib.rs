@@ -53,6 +53,7 @@ mod tests {
 
         let options = KeyPairBuilder::default()
             .with_rng(rng)
+            .with_iterations(5)
             .with_prime_gen_method(PrimeGenMethod::RandomGeneration)
             .create_keypair()
             .inspect_err(|err| println!("{}", err));
