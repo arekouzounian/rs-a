@@ -14,7 +14,6 @@ mod tests {
     use rand::rngs::StdRng;
     use rand::SeedableRng;
 
-    use std::path::Path;
     use std::sync::OnceLock;
 
     static KP: OnceLock<KeyPair> = OnceLock::new();

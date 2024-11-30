@@ -115,7 +115,6 @@ impl KeyPairBuilder {
         let mut rng = self.rng.take().unwrap_or(Box::new(StdRng::from_entropy()));
         let mr_iterations = self.miller_rabin_iterations;
 
-        dbg!("Generating modulus");
         let modulus = self
             .modulus
             .take()
@@ -131,10 +130,8 @@ impl KeyPairBuilder {
                 // PrimeGenMethod::Custom(f) => (f(&mut rng), f(&mut rng)),
             });
 
-        dbg!("Computing totient...");
         let lambda = carmichael_totient(&modulus.0, &modulus.1);
 
-        dbg!("Computing exponent...");
         let exponent = self.exponent.take().unwrap_or_else(|| {
             // compute carmichael totient = lambda
             // look for values of e that are coprime to lambda
@@ -156,7 +153,6 @@ impl KeyPairBuilder {
             e
         });
 
-        dbg!("Computing secret...");
         let secret = exponent.modinv(&lambda).ok_or_else(|| {
             RsaError::new(
                 RsaErrorKind::RsaOptionsError,
