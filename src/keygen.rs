@@ -9,7 +9,7 @@ use num::{BigUint, Integer};
 use num_bigint::RandBigInt;
 use rand::{rngs::StdRng, CryptoRng, SeedableRng};
 
-use crate::errors::RsaOptionsError;
+use crate::errors::{RsaError, RsaErrorKind}; //RsaOptionsError;
 use crate::util::{carmichael_totient, generate_candidate_prime, generate_prime_local_search};
 
 /// Each prime factor of RSA modulus `n` is 1024 bits in length.
@@ -107,7 +107,7 @@ impl KeyPairBuilder {
     }
 
     /// Consumes fields
-    pub fn create_keypair(&mut self) -> Result<KeyPair, RsaOptionsError> {
+    pub fn create_keypair(&mut self) -> Result<KeyPair, RsaError> {
         let mut rng = self.rng.take().unwrap_or(Box::new(StdRng::from_entropy()));
         let mr_iterations = self.miller_rabin_iterations;
 
@@ -153,12 +153,15 @@ impl KeyPairBuilder {
         });
 
         dbg!("Computing secret...");
-        let secret = exponent
-            .modinv(&lambda)
-            .ok_or(RsaOptionsError::new(format!(
-                "Unable to find modular inverse of {} with respect to {}.",
-                exponent, lambda
-            )))?;
+        let secret = exponent.modinv(&lambda).ok_or_else(|| {
+            RsaError::new(
+                RsaErrorKind::RsaOptionsError,
+                format!(
+                    "unable to find modular inverse of {} with respect to {}.",
+                    exponent, lambda
+                ),
+            )
+        })?;
 
         let n = &modulus.0 * &modulus.1;
 
@@ -172,15 +175,19 @@ impl KeyPairBuilder {
     }
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct KeyPair {
     pub public_key: RsaPublicKey,
     pub private_key: RsaPrivateKey,
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RsaPublicKey {
     pub modulus: BigUint,
     pub public_exponent: BigUint,
 }
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 /// [See source](https://datatracker.ietf.org/doc/html/rfc3447#appendix-A)
 pub struct RsaPrivateKey {
     pub version: u8,
@@ -234,7 +241,7 @@ impl RsaPrivateKey {
         d: BigUint,
         p: BigUint,
         q: BigUint,
-    ) -> Result<Self, RsaOptionsError> {
+    ) -> Result<Self, RsaError> {
         let one = BigUint::ZERO + 1u32;
         let p1 = &p - 1u32;
         let q1 = &q - 1u32;
@@ -242,10 +249,13 @@ impl RsaPrivateKey {
         let dp = d.modpow(&one, &p1);
         let dq = d.modpow(&one, &q1);
         let qinv = q.modinv(&p).ok_or_else(|| {
-            RsaOptionsError::new(format!(
-                "Unable to compute modular inverse of {} with respect to {}.",
-                q, p
-            ))
+            RsaError::new(
+                RsaErrorKind::RsaOptionsError,
+                format!(
+                    "Unable to compute modular inverse of {} with respect to {}.",
+                    q, p
+                ),
+            )
         })?;
 
         Ok(Self {

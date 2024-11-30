@@ -5,7 +5,7 @@
 use num::BigUint;
 
 use crate::{
-    errors::RsaCryptographyError,
+    errors::{RsaError, RsaErrorKind},
     keygen::{RsaPrivateKey, RsaPublicKey},
 };
 
@@ -16,14 +16,15 @@ pub trait RsaPrimitive {
     /// Performs a primitive encryption/decryption operation on the input integer.
     /// The integer must be within the range \[0, n-1\] (where n is the RSA modulus),
     /// or else the operation fails, and returns an `RsaCryptographyError`.
-    fn crypt(&self, message: &BigUint) -> Result<BigUint, RsaCryptographyError>;
+    fn crypt(&self, message: &BigUint) -> Result<BigUint, RsaError>;
 }
 
 impl RsaPrimitive for RsaPublicKey {
-    fn crypt(&self, message: &BigUint) -> Result<BigUint, RsaCryptographyError> {
+    fn crypt(&self, message: &BigUint) -> Result<BigUint, RsaError> {
         if message >= &self.modulus {
-            return Err(RsaCryptographyError::with_str(
-                "message representative out of range",
+            return Err(RsaError::new(
+                RsaErrorKind::RsaCryptographyError,
+                String::from("message representative out of range"),
             ));
         }
 
@@ -32,11 +33,16 @@ impl RsaPrimitive for RsaPublicKey {
 }
 
 impl RsaPrimitive for RsaPrivateKey {
-    fn crypt(&self, ciphertext: &BigUint) -> Result<BigUint, RsaCryptographyError> {
+    fn crypt(&self, ciphertext: &BigUint) -> Result<BigUint, RsaError> {
         if ciphertext >= &self.modulus {
-            return Err(RsaCryptographyError::with_str(
-                "ciphertext representative out of range",
+            return Err(RsaError::new(
+                RsaErrorKind::RsaCryptographyError,
+                String::from("ciphertext representative out of range"),
             ));
+
+            // return Err(RsaCryptographyError::with_str(
+            //     "ciphertext representative out of range",
+            // ));
         }
 
         let m_1 = ciphertext.modpow(&self.exponent1, &self.prime1);

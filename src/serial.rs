@@ -4,23 +4,35 @@
 //! More specifically, this module will be used for writing keys to files in
 //! various standardized formats, as well as reading keys in from standardized formats.
 
+use crate::errors::{RsaError, RsaErrorKind};
 use crate::keygen::{RsaPrivateKey, RsaPublicKey};
 use base64::prelude::*;
-use num::traits::ConstZero;
 use num::BigUint;
 use std::collections::VecDeque;
 use std::error::Error;
-use std::io::Error as ioError;
+
+// technically DER can have up to 128 bytes for a length
+// I want to return lengths as a usize ( = 64 bits)
+// So the largest supported number of bytes to encode
+// a single segment's length is usize/8
+const SUPPORTED_DER_LEN_SIZE: usize = (usize::BITS / u8::BITS) as usize;
+
+pub enum AsnDerValues {
+    Asn1Seq = 0x30,
+    Asn1Int = 0x02,
+}
 
 /// Reads the entire contents of an OpenSSH public key, and attempts to deserialize into an
 /// `RsaPublicKey` object.
 pub fn read_openssh_public_key(path: &std::path::Path) -> Result<RsaPublicKey, Box<dyn Error>> {
     let file_contents = std::fs::read_to_string(path)?;
 
-    let b64: &str = file_contents
-        .split_whitespace()
-        .nth(1)
-        .ok_or_else(|| ioError::new(std::io::ErrorKind::InvalidInput, "invalid ssh key"))?;
+    let b64: &str = file_contents.split_whitespace().nth(1).ok_or_else(|| {
+        RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            String::from("invalid ssh key"),
+        )
+    })?;
 
     let decode = BASE64_STANDARD.decode(b64)?;
 
@@ -66,9 +78,9 @@ fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigUint, BigUint), Box<dyn Error>> 
     }
 
     if found_nums.len() != 3 {
-        return Err(Box::new(ioError::new(
-            std::io::ErrorKind::InvalidInput,
-            "invalid ssh public key format",
+        return Err(Box::new(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            String::from("invalid ssh public key format"),
         )));
     }
 
@@ -78,24 +90,21 @@ fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigUint, BigUint), Box<dyn Error>> 
     Ok((e, m))
 }
 
-const ASN1_SEQ: u8 = 0x30;
-const ASN1_INT: u8 = 0x02;
-
 /*
 RSAPublicKey ::= SEQUENCE {
                 modulus           INTEGER,  -- n
                 publicExponent    INTEGER   -- e
             }
 */
-pub fn rsa_public_key_asn1_serialize(key: RsaPublicKey) -> Vec<u8> {
+pub fn rsa_public_key_der_serialize(key: RsaPublicKey) -> Vec<u8> {
     let mut bytes: Vec<u8> = Vec::new();
 
-    let mod_bytes = encode_asn1_int(&key.modulus);
-    let exp_bytes = encode_asn1_int(&key.public_exponent);
+    let mod_bytes = encode_der_int(&key.modulus);
+    let exp_bytes = encode_der_int(&key.public_exponent);
 
-    let seq_len = encode_asn1_len(mod_bytes.len() + exp_bytes.len());
+    let seq_len = encode_der_len(mod_bytes.len() + exp_bytes.len());
 
-    bytes.push(ASN1_SEQ);
+    bytes.push(AsnDerValues::Asn1Seq as u8);
     bytes.extend(seq_len);
     bytes.extend(mod_bytes);
     bytes.extend(exp_bytes);
@@ -103,20 +112,20 @@ pub fn rsa_public_key_asn1_serialize(key: RsaPublicKey) -> Vec<u8> {
     bytes
 }
 
-pub fn rsa_private_key_asn1_serialize(key: RsaPrivateKey) -> Vec<u8> {
+pub fn rsa_private_key_der_serialize(key: RsaPrivateKey) -> Vec<u8> {
     let mut bytes: Vec<u8> = Vec::new();
 
-    let version_bytes = encode_asn1_int(&BigUint::ZERO);
-    let mod_bytes = encode_asn1_int(&key.modulus);
-    let exp_bytes = encode_asn1_int(&key.public_exponent);
-    let d_bytes = encode_asn1_int(&key.private_exponent);
-    let p_bytes = encode_asn1_int(&key.prime1);
-    let q_bytes = encode_asn1_int(&key.prime2);
-    let dp_bytes = encode_asn1_int(&key.exponent1);
-    let dq_bytes = encode_asn1_int(&key.exponent2);
-    let qinv_bytes = encode_asn1_int(&key.coefficient);
+    let version_bytes = encode_der_int(&BigUint::ZERO);
+    let mod_bytes = encode_der_int(&key.modulus);
+    let exp_bytes = encode_der_int(&key.public_exponent);
+    let d_bytes = encode_der_int(&key.private_exponent);
+    let p_bytes = encode_der_int(&key.prime1);
+    let q_bytes = encode_der_int(&key.prime2);
+    let dp_bytes = encode_der_int(&key.exponent1);
+    let dq_bytes = encode_der_int(&key.exponent2);
+    let qinv_bytes = encode_der_int(&key.coefficient);
 
-    let seq_len = encode_asn1_len(
+    let seq_len = encode_der_len(
         version_bytes.len()
             + mod_bytes.len()
             + exp_bytes.len()
@@ -128,7 +137,7 @@ pub fn rsa_private_key_asn1_serialize(key: RsaPrivateKey) -> Vec<u8> {
             + qinv_bytes.len(),
     );
 
-    bytes.push(ASN1_SEQ);
+    bytes.push(AsnDerValues::Asn1Seq as u8);
     bytes.extend(seq_len);
     bytes.extend(version_bytes);
     bytes.extend(mod_bytes);
@@ -143,7 +152,47 @@ pub fn rsa_private_key_asn1_serialize(key: RsaPrivateKey) -> Vec<u8> {
     bytes
 }
 
-fn encode_asn1_len(mut len: usize) -> VecDeque<u8> {
+pub fn rsa_public_key_der_deserialize(data: Vec<u8>) -> Result<RsaPublicKey, RsaError> {
+    // parse seq
+    // parse two ints
+    let mut data: VecDeque<u8> = VecDeque::from(data);
+    if data.len() < 2 {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            format!("Invalid input length: needed 2, have {}", data.len()),
+        ));
+    }
+
+    if data.pop_front().unwrap() != AsnDerValues::Asn1Seq as u8 {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            String::from("Invalid input: doesn't contain SEQ byte"),
+        ));
+    }
+
+    let len = decode_der_len(&mut data)?;
+
+    if data.len() < len {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            format!(
+                "Invalid input: sequence length {}, actual {}",
+                len,
+                data.len()
+            ),
+        ));
+    }
+
+    let n = decode_der_int(&mut data)?;
+    let e = decode_der_int(&mut data)?;
+
+    Ok(RsaPublicKey::new(e, n))
+
+    // RsaSerialError::new(io::ErrorKind::InvalidInput, "")
+}
+
+// add check for unsupported len?
+fn encode_der_len(mut len: usize) -> VecDeque<u8> {
     if len <= 0x7F {
         return VecDeque::from(vec![len as u8]);
     }
@@ -160,7 +209,49 @@ fn encode_asn1_len(mut len: usize) -> VecDeque<u8> {
     v
 }
 
-fn encode_asn1_int(int: &BigUint) -> VecDeque<u8> {
+fn decode_der_len(data: &mut VecDeque<u8>) -> Result<usize, RsaError> {
+    if data.len() < 2 {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            String::from("Invalid input length: must have at least 2 bytes"),
+        ));
+    }
+
+    let lenlen = data.pop_front().unwrap();
+    if lenlen <= 0x7F {
+        return Ok(lenlen as usize);
+    }
+
+    let num_len_bytes = (lenlen & 0x7F) as usize;
+
+    if data.len() < num_len_bytes {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            format!("Invalid input length: needed 2, have {}", data.len()),
+        ));
+    } else if num_len_bytes > SUPPORTED_DER_LEN_SIZE {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            format!(
+                "Size not supported: maximum width of a DER object's length is {} bytes",
+                SUPPORTED_DER_LEN_SIZE
+            ),
+        ));
+    }
+
+    let mut ret: usize = 0;
+    for i in 0..num_len_bytes {
+        ret += data.pop_front().unwrap() as usize;
+
+        if i < num_len_bytes - 1 {
+            ret <<= 8;
+        }
+    }
+
+    Ok(ret)
+}
+
+fn encode_der_int(int: &BigUint) -> VecDeque<u8> {
     let mut bytes = VecDeque::from(int.to_bytes_be());
 
     // If it has a first order bit set, we need to add a 0 byte to the front
@@ -168,11 +259,55 @@ fn encode_asn1_int(int: &BigUint) -> VecDeque<u8> {
         bytes.push_front(0x00);
     }
 
-    let len_bytes = encode_asn1_len(bytes.len());
+    let len_bytes = encode_der_len(bytes.len());
     for b in len_bytes.iter().rev() {
         bytes.push_front(b.clone());
     }
-    bytes.push_front(ASN1_INT);
+    bytes.push_front(AsnDerValues::Asn1Int as u8);
 
     bytes
+}
+
+fn decode_der_int(data: &mut VecDeque<u8>) -> Result<BigUint, RsaError> {
+    if data.len() < 2 {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            format!("Invalid int width: needed 2, has {}", data.len()),
+        ));
+    }
+
+    let first = data.pop_front().unwrap();
+    if first != AsnDerValues::Asn1Int as u8 {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            format!(
+                "Invalid integer DER tag: tag {}, actual {}",
+                AsnDerValues::Asn1Int as u8,
+                first,
+            ),
+        ));
+    }
+
+    let mut len = decode_der_len(data)?;
+
+    if data.len() < len {
+        return Err(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            format!("Invalid input: length {}, actual {}", len, data.len()),
+        ));
+    }
+
+    let mut bytes = Vec::with_capacity(len);
+
+    let first = data.pop_front().unwrap();
+    if first != 0x00 {
+        bytes.push(first);
+    }
+    len -= 1;
+
+    for _ in 0..len {
+        bytes.push(data.pop_front().unwrap());
+    }
+
+    Ok(BigUint::from_bytes_be(&bytes))
 }
