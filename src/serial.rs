@@ -12,9 +12,8 @@ use std::collections::VecDeque;
 use std::error::Error;
 
 // technically DER can have up to 128 bytes for a length
-// I want to return lengths as a usize ( = 64 bits)
-// So the largest supported number of bytes to encode
-// a single segment's length is usize/8
+// but for the purposes of this library the largest supported
+// number of length bytes is usize/8
 const SUPPORTED_DER_LEN_SIZE: usize = (usize::BITS / u8::BITS) as usize;
 
 pub enum AsnDerValues {
@@ -39,6 +38,46 @@ pub fn read_openssh_public_key(path: &std::path::Path) -> Result<RsaPublicKey, B
     let (e, n) = parse_pub_key(&decode)?;
     Ok(RsaPublicKey::new(e, n))
 }
+
+pub fn pem_publickey_encode(data: Vec<u8>) -> String {
+    let mut ret = String::from("-----BEGIN RSA PUBLIC KEY-----\n");
+    ret.push_str(BASE64_STANDARD.encode(data).as_str());
+    ret.push_str("\n-----END RSA PUBLIC KEY-----");
+    ret
+}
+
+// pretty dirty, doesn't do much checking. Not ideal.
+pub fn pem_decode(data: String) -> Result<Vec<u8>, Box<dyn Error>> {
+    if data.lines().count() < 3 {
+        return Err(Box::new(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            String::from("Invalid PEM: must have at least 3 lines"),
+        )));
+    }
+
+    Ok(BASE64_STANDARD.decode(data.lines().nth(1).unwrap())?)
+}
+
+pub fn pem_privatekey_encode(data: Vec<u8>) -> String {
+    let mut ret = String::from("-----BEGIN RSA PRIVATE KEY-----\n");
+    ret.push_str(BASE64_STANDARD.encode(data).as_str());
+    ret.push_str("\n-----END RSA PRIVATE KEY-----");
+    ret
+}
+
+pub fn pem_publickey_decode(data: String) -> Result<Vec<u8>, Box<dyn Error>> {
+    if data.lines().count() < 3 {
+        return Err(Box::new(RsaError::new(
+            RsaErrorKind::RsaSerialError,
+            String::from("Invalid PEM: must have at least 3 lines"),
+        )));
+    }
+
+    Ok(BASE64_STANDARD.decode(data.lines().nth(1).unwrap())?)
+}
+
+// pub fn pkcs_8_encode()
+// pub fn pkcs_8_decode()
 
 /// Returns (exponent, modulus)
 fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigUint, BigUint), Box<dyn Error>> {

@@ -13,9 +13,23 @@ While the library contained herein is intended to adhere to [RFC 8017](https://w
 I am still very new to Rust, so this library is likely to be non-idiomatic. I'm also very new to the number theory behind RSA, so despite my attempts at making clean and correct code, this library isn't guaranteed to be very performant.
 
 
-# Goals:
-- 2 prime RSA
-- 2048 bit modulus
+## Project Goals
+- [x] Key Generation 
+    - [] Stretch: user-defined prime testing functions 
+    - [] Stretch: sieving w/ pre-computed primes 
+- [x] Cryptographic Primitives
+- [] Keypair Serialization/Deserialization
+    - [x] DER
+    - [x] PEM
+    - [] PKCS8
+    - [] Stretch: OpenSSH Integration
+- [] Encryption
+    - [x] Cryptographic Primitives 
+    - [] RSAES-OAEP
+    - [] RSAES-PKCS1-v1_5
+- [] Signatures
+    - [] RSASSA-PSS
+    - [] RSASSA-PKCS1-v1_5
 
 ## Notes & Reference Materials
 - [RFC 8017 - PKCS1 v2.2](https://www.rfc-editor.org/rfc/rfc8017)
@@ -28,3 +42,4 @@ I am still very new to Rust, so this library is likely to be non-idiomatic. I'm 
 - [Rust API Guidelines](https://rust-lang.github.io/api-guidelines/)
 - [Idiomatic Rust Resources](https://corrode.dev/blog/idiomatic-rust-resources/)
 - [ASN1 & DER article](https://coolaj86.com/articles/asn1-for-dummies/)
+- [Let's encrypt DER/ASN.1 intro](https://letsencrypt.org/docs/a-warm-welcome-to-asn1-and-der/)
