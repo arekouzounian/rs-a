@@ -107,6 +107,10 @@ impl KeyPairBuilder {
     }
 
     /// Consumes fields
+    /// TODO:
+    /// - smaller prime sieving (precomputed primes < 10,000?)
+    /// - optimize bases for miller-rabin?
+    /// - miller-rabin multithreading?
     pub fn create_keypair(&mut self) -> Result<KeyPair, RsaError> {
         let mut rng = self.rng.take().unwrap_or(Box::new(StdRng::from_entropy()));
         let mr_iterations = self.miller_rabin_iterations;

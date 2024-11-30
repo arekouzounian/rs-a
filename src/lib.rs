@@ -103,19 +103,31 @@ mod tests {
     }
 
     #[test]
-    fn test_serial() {
-        let res = read_openssh_public_key(Path::new("/Users/arekouzounian/.ssh/id_rsa.pub"));
-        assert!(res.is_ok());
+    fn test_publickey_serial() {
+        // TODO:
+        //  - maybe change to pre-computed key from ssh-keygen?
+        //  - add more error handling to serialization?
 
-        //     let ret = rsa_public_key_asn1_serialize(res.unwrap());
-        let pk = res.unwrap();
+        let kp = default_keypair();
 
-        let serial = rsa_public_key_der_serialize(pk.clone());
+        let pk = kp.public_key.clone();
 
-        let deserial = rsa_public_key_der_deserialize(serial).inspect_err(|e| println!("{:?}", e));
+        let pk_serial = rsa_public_key_der_serialize(pk.clone());
+        let pk_deserial = rsa_public_key_der_deserialize(pk_serial);
 
-        let deserialized_pk = deserial.unwrap();
+        assert!(pk_deserial.is_ok());
+        assert_eq!(pk, pk_deserial.unwrap());
+    }
 
-        assert_eq!(pk, deserialized_pk);
+    #[test]
+    fn test_privatekey_serial() {
+        let kp = default_keypair();
+        let sk = kp.private_key.clone();
+
+        let sk_serial = rsa_private_key_der_serialize(sk.clone());
+        let sk_deserial = rsa_private_key_der_deserialize(sk_serial);
+
+        assert!(sk_deserial.is_ok());
+        assert_eq!(sk, sk_deserial.unwrap());
     }
 }
