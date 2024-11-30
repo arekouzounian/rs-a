@@ -13,14 +13,9 @@ use crate::keygen::{RsaCsprng, RSA_PRIME_NUMBER_BIT_LENGTH};
 pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
     let mut num = generate_random_odd_big_uint(rng);
 
-    let mut it = 1;
-
     while !miller_rabin_is_prime(rng, &num, mr_iterations) {
         num = generate_random_odd_big_uint(rng);
-        it += 1;
     }
-
-    dbg!("Total iterations necessary: {}", it);
 
     num
 }
@@ -36,14 +31,10 @@ pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usi
 pub fn generate_prime_local_search(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
     let mut num = generate_random_odd_big_uint(rng);
 
-    let mut it = 1;
     while !(miller_rabin_is_prime(rng, &num, mr_iterations)) {
         num.inc();
         num.inc();
-        it += 1;
     }
-
-    dbg!("Total increments necessary: {}", it);
 
     num
 }
