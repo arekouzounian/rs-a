@@ -5,7 +5,7 @@ pub mod serial;
 pub mod util;
 
 #[cfg(test)]
-mod tests {
+mod test {
     use crate::crypto::*;
     use crate::keygen::*;
     use crate::serial::*;
@@ -112,10 +112,14 @@ mod tests {
         let pk = kp.public_key.clone();
 
         let pk_serial = rsa_public_key_der_serialize(pk.clone());
-        let pk_deserial = rsa_public_key_der_deserialize(pk_serial);
+        let pem_serial = pem_publickey_encode(pk_serial.clone());
+        let pk_deserial = rsa_public_key_der_deserialize(pk_serial.clone());
+        let pem_deserial = pem_decode(pem_serial);
 
         assert!(pk_deserial.is_ok());
         assert_eq!(pk, pk_deserial.unwrap());
+        assert!(pem_deserial.is_ok());
+        assert_eq!(pk_serial, pem_deserial.unwrap());
     }
 
     #[test]
@@ -124,9 +128,13 @@ mod tests {
         let sk = kp.private_key.clone();
 
         let sk_serial = rsa_private_key_der_serialize(sk.clone());
-        let sk_deserial = rsa_private_key_der_deserialize(sk_serial);
+        let pem_serial = pem_privatekey_encode(sk_serial.clone());
+        let sk_deserial = rsa_private_key_der_deserialize(sk_serial.clone());
+        let pem_deserial = pem_decode(pem_serial);
 
         assert!(sk_deserial.is_ok());
         assert_eq!(sk, sk_deserial.unwrap());
+        assert!(pem_deserial.is_ok());
+        assert_eq!(sk_serial, pem_deserial.unwrap());
     }
 }

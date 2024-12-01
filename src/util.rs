@@ -32,8 +32,7 @@ pub fn generate_prime_local_search(rng: &mut Box<dyn RsaCsprng>, mr_iterations: 
     let mut num = generate_random_odd_big_uint(rng);
 
     while !(miller_rabin_is_prime(rng, &num, mr_iterations)) {
-        num.inc();
-        num.inc();
+        num += 2u32;
     }
 
     num
@@ -69,21 +68,21 @@ fn miller_rabin_is_prime(
     let two = BigUint::ZERO + 2u32;
     let one = BigUint::ZERO + 1u32;
 
+    if prime_candidate.eq(&BigUint::ZERO) {
+        return false;
+    }
+
     // if the prime candidate is even or 2 then we don't want to count it.
     if prime_candidate.eq(&two) || prime_candidate.modpow(&one, &two) == BigUint::ZERO {
         return false;
     }
 
     let p_minus_one = prime_candidate - 1u32;
-    let mut u: u32 = 0;
-    let mut r = p_minus_one.clone();
 
-    while r.bit(0) == false {
-        r = r >> 1;
-        u += 1;
-    }
+    let u = p_minus_one.trailing_zeros().unwrap() as u32;
+    let r = &p_minus_one >> u;
 
-    // assert!(p_minus_one == (two.pow(u) * r));
+    // assert!(p_minus_one == (two.pow(u) * &r));
 
     for _ in 0..iterations {
         let a = rng.gen_biguint_range(&two, &p_minus_one);
@@ -119,4 +118,42 @@ fn test_witness(a: &BigUint, p: &BigUint, u: &u32, r: &BigUint) -> bool {
     }
 
     true
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand::prelude::*;
+    use std::time::Instant;
+
+    #[test]
+    fn benchmark() {
+        const NUM_ITER: usize = 10;
+
+        let mut rng: Box<dyn RsaCsprng> = Box::new(StdRng::from_entropy());
+
+        let mut times: [u128; NUM_ITER] = [0; NUM_ITER];
+
+        let p = generate_prime_local_search(&mut rng, 6);
+        println!("candidate found, performing benchmark");
+
+        let total = Instant::now();
+
+        for i in times.iter_mut() {
+            let start = Instant::now();
+            miller_rabin_is_prime(&mut rng, &p, 5);
+            let milli = start.elapsed().as_millis();
+
+            *i = milli;
+        }
+
+        println!(
+            "Total elapsed time: {}\nTotal iterations: {}\nAverage time per iteration: {}\n",
+            total.elapsed().as_millis(),
+            NUM_ITER,
+            (times.iter().sum::<u128>() as f64) / (NUM_ITER as f64)
+        );
+
+        // println!("{:?}", x);
+    }
 }

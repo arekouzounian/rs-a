@@ -39,41 +39,46 @@ pub fn read_openssh_public_key(path: &std::path::Path) -> Result<RsaPublicKey, B
     Ok(RsaPublicKey::new(e, n))
 }
 
+// https://datatracker.ietf.org/doc/html/rfc7468#section-2
+// lines must be 64 characters max
+const PEM_LINE_MAX: usize = 64;
+
 pub fn pem_publickey_encode(data: Vec<u8>) -> String {
     let mut ret = String::from("-----BEGIN RSA PUBLIC KEY-----\n");
-    ret.push_str(BASE64_STANDARD.encode(data).as_str());
+    let encoded = BASE64_STANDARD.encode(data);
+    ret = encoded.chars().enumerate().fold(ret, |mut acc, (i, c)| {
+        acc.push(c);
+        if (i + 1) % PEM_LINE_MAX == 0 {
+            acc.push('\n');
+        }
+        acc
+    });
+
     ret.push_str("\n-----END RSA PUBLIC KEY-----");
     ret
 }
 
 // pretty dirty, doesn't do much checking. Not ideal.
 pub fn pem_decode(data: String) -> Result<Vec<u8>, Box<dyn Error>> {
-    if data.lines().count() < 3 {
-        return Err(Box::new(RsaError::new(
-            RsaErrorKind::RsaSerialError,
-            String::from("Invalid PEM: must have at least 3 lines"),
-        )));
-    }
-
-    Ok(BASE64_STANDARD.decode(data.lines().nth(1).unwrap())?)
+    Ok(BASE64_STANDARD.decode(
+        data.lines()
+            .filter(|line| !line.starts_with("-----"))
+            .collect::<String>(),
+    )?)
 }
 
 pub fn pem_privatekey_encode(data: Vec<u8>) -> String {
     let mut ret = String::from("-----BEGIN RSA PRIVATE KEY-----\n");
-    ret.push_str(BASE64_STANDARD.encode(data).as_str());
+    let encoded = BASE64_STANDARD.encode(data);
+    ret = encoded.chars().enumerate().fold(ret, |mut acc, (i, c)| {
+        acc.push(c);
+        if (i + 1) % PEM_LINE_MAX == 0 {
+            acc.push('\n');
+        }
+        acc
+    });
     ret.push_str("\n-----END RSA PRIVATE KEY-----");
     ret
-}
-
-pub fn pem_publickey_decode(data: String) -> Result<Vec<u8>, Box<dyn Error>> {
-    if data.lines().count() < 3 {
-        return Err(Box::new(RsaError::new(
-            RsaErrorKind::RsaSerialError,
-            String::from("Invalid PEM: must have at least 3 lines"),
-        )));
-    }
-
-    Ok(BASE64_STANDARD.decode(data.lines().nth(1).unwrap())?)
 }
 
 // pub fn pkcs_8_encode()
