@@ -87,9 +87,7 @@ impl KeyPairBuilder {
 
     /// Consumes fields
     /// TODO:
-    /// - smaller prime sieving (precomputed primes < 10,000?)
-    /// - optimize bases for miller-rabin?
-    /// - miller-rabin multithreading?
+    /// - prime-gen multithreading?
     pub fn create_keypair(&mut self) -> Result<KeyPair, RsaError> {
         let mut rng = self.rng.take().unwrap_or(Box::new(StdRng::from_entropy()));
         let mr_iterations = self.miller_rabin_iterations;
@@ -213,12 +211,12 @@ impl RsaPrivateKey {
         p: BigUint,
         q: BigUint,
     ) -> Result<Self, RsaError> {
-        let one = BigUint::ZERO + 1u32;
         let p1 = &p - 1u32;
         let q1 = &q - 1u32;
 
-        let dp = d.modpow(&one, &p1);
-        let dq = d.modpow(&one, &q1);
+        let dp = &d % &p1;
+        let dq = &d % &q1;
+
         let qinv = q.modinv(&p).ok_or_else(|| {
             RsaError::new(
                 RsaErrorKind::RsaOptionsError,

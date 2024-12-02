@@ -44,3 +44,4 @@ I am still very new to Rust, so this library is likely to be non-idiomatic. I'm 
 - [ASN1 & DER article](https://coolaj86.com/articles/asn1-for-dummies/)
 - [Let's encrypt DER/ASN.1 intro](https://letsencrypt.org/docs/a-warm-welcome-to-asn1-and-der/)
 - [Baillie-PSW prime test](https://en.wikipedia.org/wiki/Baillie%E2%80%93PSW_primality_test)
+- [OpenSSL Repo](https://github.com/openssl/openssl/)

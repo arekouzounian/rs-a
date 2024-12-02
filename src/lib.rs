@@ -76,20 +76,13 @@ mod test {
 
         let d = decrypt_res.unwrap();
 
-        println!(
-            "p: {}\nq: {}",
-            &kp.private_key.prime1, &kp.private_key.prime2
-        );
+        println!("{:?}", kp.private_key);
 
         assert_eq!(m, d);
     }
 
     #[test]
     fn test_publickey_serial() {
-        // TODO:
-        //  - maybe change to pre-computed key from ssh-keygen?
-        //  - add more error handling to serialization?
-
         let kp = default_keypair();
 
         let pk = kp.public_key.clone();
