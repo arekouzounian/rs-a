@@ -10,7 +10,7 @@ use num_bigint::RandBigInt;
 use rand::{rngs::StdRng, CryptoRng, SeedableRng};
 
 use crate::errors::{RsaError, RsaErrorKind}; //RsaOptionsError;
-use crate::util::{carmichael_totient, generate_candidate_prime, generate_prime_local_search};
+use crate::util::{carmichael_totient, generate_candidate_prime};
 
 /// Each prime factor of RSA modulus `n` is 1024 bits in length.
 pub const RSA_PRIME_NUMBER_BIT_LENGTH: u64 = 1024;
@@ -26,18 +26,6 @@ pub const RSA_VERSION: u8 = 0;
 
 /// The default number of miller-rabin primality tests to conduct
 pub const DEFAULT_MR_ITERATIONS: usize = 1;
-
-/// The method by which to generate primes
-pub enum PrimeGenMethod {
-    /// This method generates odd numbers at random until a number is found that passes the
-    /// various rounds of Miller-Rabin primality testing.
-    RandomGeneration,
-
-    /// This method generates one odd number at random, then increments it until a number
-    /// is found that passes the various rounds of Miller-Rabin primality testing.
-    RandomizedLocalSearch,
-    // Custom(F) ?
-}
 
 pub trait RsaCsprng: CryptoRng + RandBigInt {}
 impl<T: CryptoRng + RandBigInt> RsaCsprng for T {}
@@ -66,10 +54,6 @@ pub struct KeyPairBuilder {
     ///
     /// By default, the number of iterations is `1` for quick key generation, but it's recommended to increase this value.
     miller_rabin_iterations: usize,
-
-    /// The method by which to generate primes. See the `PrimeGenMethod` enum for more information.
-    prime_generation_method: PrimeGenMethod,
-    // private key representation
 }
 
 impl Default for KeyPairBuilder {
@@ -79,7 +63,6 @@ impl Default for KeyPairBuilder {
             modulus: None,
             rng: None,
             miller_rabin_iterations: DEFAULT_MR_ITERATIONS,
-            prime_generation_method: PrimeGenMethod::RandomizedLocalSearch,
         }
     }
 }
@@ -101,10 +84,6 @@ impl KeyPairBuilder {
         self.miller_rabin_iterations = iterations;
         self
     }
-    pub fn with_prime_gen_method(&mut self, m: PrimeGenMethod) -> &mut Self {
-        self.prime_generation_method = m;
-        self
-    }
 
     /// Consumes fields
     /// TODO:
@@ -115,20 +94,12 @@ impl KeyPairBuilder {
         let mut rng = self.rng.take().unwrap_or(Box::new(StdRng::from_entropy()));
         let mr_iterations = self.miller_rabin_iterations;
 
-        let modulus = self
-            .modulus
-            .take()
-            .unwrap_or_else(|| match &self.prime_generation_method {
-                PrimeGenMethod::RandomGeneration => (
-                    generate_candidate_prime(&mut rng, mr_iterations),
-                    generate_candidate_prime(&mut rng, mr_iterations),
-                ),
-                PrimeGenMethod::RandomizedLocalSearch => (
-                    generate_prime_local_search(&mut rng, mr_iterations),
-                    generate_prime_local_search(&mut rng, mr_iterations),
-                ),
-                // PrimeGenMethod::Custom(f) => (f(&mut rng), f(&mut rng)),
-            });
+        let modulus = self.modulus.take().unwrap_or_else(|| {
+            (
+                generate_candidate_prime(&mut rng, mr_iterations),
+                generate_candidate_prime(&mut rng, mr_iterations),
+            )
+        });
 
         let lambda = carmichael_totient(&modulus.0, &modulus.1);
 
