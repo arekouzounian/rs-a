@@ -25,7 +25,7 @@ pub const RSA_MODULUS_BIT_LENGTH: usize = 2048;
 pub const RSA_VERSION: u8 = 0;
 
 /// The default number of miller-rabin primality tests to conduct
-pub const DEFAULT_MR_ITERATIONS: usize = 1;
+pub const DEFAULT_MR_ITERATIONS: usize = 10;
 
 pub trait RsaCsprng: CryptoRng + RandBigInt {}
 impl<T: CryptoRng + RandBigInt> RsaCsprng for T {}

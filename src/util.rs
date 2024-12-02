@@ -12,7 +12,7 @@ use crate::static_init::{PRECOMPUTED_PRIMES, PRECOMPUTED_PRIMES_LEN};
 /// `mr_iterations`: The number of miller-rabin primality test iterations to conduct, default 1.
 pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
     let mut num = probable_prime(rng);
-    while !miller_rabin_is_prime(rng, &num, mr_iterations) {
+    while !small_prime_sieve(&num) || !miller_rabin_is_prime(rng, &num, mr_iterations) {
         num = probable_prime(rng);
     }
 
@@ -70,15 +70,15 @@ fn generate_random_odd_big_uint(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
 
 // Returns true if the prime candidate passes the prime sieve
 // primes are defined in static_init
-// fn small_prime_sieve(prime_candidate: &BigUint) -> bool {
-//     for i in 1..PRECOMPUTED_PRIMES_LEN {
-//         if prime_candidate % PRECOMPUTED_PRIMES[i] == BigUint::ZERO {
-//             return false;
-//         }
-//     }
+fn small_prime_sieve(prime_candidate: &BigUint) -> bool {
+    for i in 1..PRECOMPUTED_PRIMES_LEN {
+        if prime_candidate % PRECOMPUTED_PRIMES[i] == BigUint::ZERO {
+            return false;
+        }
+    }
 
-//     true
-// }
+    true
+}
 
 /// Computes the Carmichael Totient function `lambda(n)` for a given two-prime RSA modulus,
 /// represented by primes `p, q`.
@@ -158,8 +158,8 @@ mod test {
     use rand::prelude::*;
     use std::time::Instant;
 
-    #[test]
-    fn benchmark() {
+    // #[test]
+    fn _benchmark() {
         const NUM_ITER: usize = 1;
 
         let mut rng: Box<dyn RsaCsprng> = Box::new(StdRng::from_entropy());

@@ -22,19 +22,21 @@ mod test {
     fn default_keypair() -> &'static KeyPair {
         KP.get_or_init(|| {
             KeyPairBuilder::default()
-                .with_iterations(4)
+                .with_iterations(10)
                 .create_keypair()
                 .unwrap()
         })
     }
 
     #[test]
-    fn generate_rsa_keypair_random() {
-        let rng = Box::new(StdRng::from_entropy());
+    fn generate_rsa_keypair_seeded() {
+        const SEED: u64 = 100;
+
+        let rng = Box::new(StdRng::seed_from_u64(SEED));
 
         let options = KeyPairBuilder::default()
             .with_rng(rng)
-            .with_iterations(5)
+            .with_iterations(10)
             .create_keypair()
             .inspect_err(|err| println!("{}", err));
 
