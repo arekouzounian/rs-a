@@ -1,5 +1,6 @@
-import math 
+# Don't judge me I'm just going a bit insane 
 
+import math 
 
 def encrypt(m, e, n):
     return pow(m, e, n) # m ^ e mod n
@@ -54,11 +55,6 @@ def main(n, e, d, p ,q, dp, dq, qinv, m):
     print('decrypted:',d)
 
     print('success' if d == m else 'failure')
-
-
-
-
-
 
 
 if __name__ == '__main__':
