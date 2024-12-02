@@ -1,8 +1,8 @@
 //! Utility functions
-
-use num::{BigUint, Integer};
+use num::{BigUint, Integer, ToPrimitive};
 
 use crate::keygen::{RsaCsprng, RSA_PRIME_NUMBER_BIT_LENGTH};
+use crate::static_init::{PRECOMPUTED_PRIMES, PRECOMPUTED_PRIMES_LEN};
 
 /// Generates a candidate prime (see `keygen.rs` for bit length) by repeated random drawing.
 /// Applies the Miller-Rabin Primality test `mr_iterations` times to test for primality.
@@ -11,42 +11,73 @@ use crate::keygen::{RsaCsprng, RSA_PRIME_NUMBER_BIT_LENGTH};
 ///
 /// `mr_iterations`: The number of miller-rabin primality test iterations to conduct, default 1.
 pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
-    let mut num = generate_random_odd_big_uint(rng);
-
-    while !miller_rabin_is_prime(rng, &num, mr_iterations) {
-        num = generate_random_odd_big_uint(rng);
+    let mut num = probable_prime(rng);
+    while !small_prime_sieve(&num) || !miller_rabin_is_prime(rng, &num, mr_iterations) {
+        num = probable_prime(rng);
     }
 
     num
 }
 
-/// Generates a candidate prime (see `keygen.rs` for bit length) by an initial random
-/// drawing, and then continuous incrementation (local search).
-/// Applies the Miller-Rabin Primality test `mr_iterations` times to test for primality.
-///
-/// `rng`: The CSPRNG used to generate primes
-///
-/// `mr_iterations`: The number of miller-rabin primality test iterations to conduct,
-/// default 1.
-pub fn generate_prime_local_search(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
-    let mut num = generate_random_odd_big_uint(rng);
+/// Replicating the probable_prime() generation from OpenSSL
+/// [See Source](https://github.com/openssl/openssl/blob/4a4505cc645d2e862e368e2823e921a564112ca2/crypto/bn/bn_prime.c#L487)
+fn probable_prime(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
+    let mut mods: [u64; PRECOMPUTED_PRIMES_LEN] = [0; 512];
+    const MAX_DELTA: u64 = u64::MAX - PRECOMPUTED_PRIMES[PRECOMPUTED_PRIMES_LEN - 1];
 
-    while !(miller_rabin_is_prime(rng, &num, mr_iterations)) {
-        num += 2u32;
+    'full_gen: loop {
+        let mut candidate = generate_random_odd_big_uint(rng);
+
+        for i in 1..PRECOMPUTED_PRIMES_LEN {
+            mods[i] = (&candidate % PRECOMPUTED_PRIMES[i]).to_u64().unwrap();
+        }
+
+        let mut delta: u64 = 0;
+
+        'check_mods: loop {
+            for i in 1..PRECOMPUTED_PRIMES_LEN {
+                if (mods[i] + delta) % PRECOMPUTED_PRIMES[i] == 0 {
+                    delta += 2;
+                    if delta > MAX_DELTA {
+                        continue 'full_gen;
+                    }
+                    continue 'check_mods;
+                }
+            }
+            break;
+        }
+
+        candidate += delta;
+        if candidate.bits() != RSA_PRIME_NUMBER_BIT_LENGTH {
+            continue;
+        }
+
+        return candidate;
     }
-
-    num
 }
 
 /// Generates a large, odd integer
+/// Top 2 bits are always set
 fn generate_random_odd_big_uint(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
     let x = rng.gen_biguint(RSA_PRIME_NUMBER_BIT_LENGTH);
 
-    if x.bit(0) == true {
-        return x;
+    if x.is_even() {
+        return x - 1u32;
     }
 
-    x - 1u32
+    x
+}
+
+// Returns true if the prime candidate passes the prime sieve
+// primes are defined in static_init
+fn small_prime_sieve(prime_candidate: &BigUint) -> bool {
+    for i in 1..PRECOMPUTED_PRIMES_LEN {
+        if prime_candidate % PRECOMPUTED_PRIMES[i] == BigUint::ZERO {
+            return false;
+        }
+    }
+
+    true
 }
 
 /// Computes the Carmichael Totient function `lambda(n)` for a given two-prime RSA modulus,
@@ -60,6 +91,7 @@ pub fn carmichael_totient(p: &BigUint, q: &BigUint) -> BigUint {
 // A successful candidate will be an odd integer.
 // Every odd prime can be decomposed into the form (p - 1) = 2^u * r,
 // where r is an odd integer.
+
 fn miller_rabin_is_prime(
     rng: &mut Box<dyn RsaCsprng>,
     prime_candidate: &BigUint,
@@ -126,32 +158,30 @@ mod test {
     use rand::prelude::*;
     use std::time::Instant;
 
-    #[test]
-    fn benchmark() {
-        const NUM_ITER: usize = 10;
+    // #[test]
+    fn _benchmark() {
+        const NUM_ITER: usize = 1;
 
         let mut rng: Box<dyn RsaCsprng> = Box::new(StdRng::from_entropy());
 
-        let mut times: [u128; NUM_ITER] = [0; NUM_ITER];
-
-        let p = generate_prime_local_search(&mut rng, 6);
-        println!("candidate found, performing benchmark");
+        let mut times: [f64; NUM_ITER] = [0.0; NUM_ITER];
 
         let total = Instant::now();
 
         for i in times.iter_mut() {
             let start = Instant::now();
-            miller_rabin_is_prime(&mut rng, &p, 5);
-            let milli = start.elapsed().as_millis();
+            // generate_candidate_prime(&mut rng, 1);
+            probable_prime(&mut rng);
+            let milli = start.elapsed().as_secs_f64();
 
             *i = milli;
         }
 
         println!(
-            "Total elapsed time: {}\nTotal iterations: {}\nAverage time per iteration: {}\n",
-            total.elapsed().as_millis(),
+            "Total elapsed time: {}s\nTotal iterations: {}\nAverage time per iteration: {}s\n",
+            total.elapsed().as_secs_f64(),
             NUM_ITER,
-            (times.iter().sum::<u128>() as f64) / (NUM_ITER as f64)
+            (times.iter().sum::<f64>()) / (NUM_ITER as f64)
         );
 
         // println!("{:?}", x);
