@@ -7,9 +7,10 @@ use std::error;
 
 #[derive(Debug)]
 pub enum RsaErrorKind {
-    RsaOptionsError,
-    RsaSerialError,
-    RsaCryptographyError,
+    OptionsError,
+    SerialError,
+    CryptographyError,
+    MaskGenerationFunctionError,
 }
 
 #[derive(Debug)]
@@ -21,9 +22,10 @@ pub struct RsaError {
 impl Display for RsaError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let err_kind = match self.kind {
-            RsaErrorKind::RsaOptionsError => "RsaOptionsError",
-            RsaErrorKind::RsaSerialError => "RsaSerialError",
-            RsaErrorKind::RsaCryptographyError => "RsaCryptographyError",
+            RsaErrorKind::OptionsError => "OptionsError",
+            RsaErrorKind::SerialError => "SerialError",
+            RsaErrorKind::CryptographyError => "CryptographyError",
+            RsaErrorKind::MaskGenerationFunctionError => "MaskGenerationFunctionError",
         };
 
         write!(f, "{}: {}", err_kind, self.message)

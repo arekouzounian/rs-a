@@ -124,7 +124,7 @@ impl KeyPairBuilder {
 
         let secret = exponent.modinv(&lambda).ok_or_else(|| {
             RsaError::new(
-                RsaErrorKind::RsaOptionsError,
+                RsaErrorKind::OptionsError,
                 format!(
                     "unable to find modular inverse of {} with respect to {}.",
                     exponent, lambda
@@ -219,7 +219,7 @@ impl RsaPrivateKey {
 
         let qinv = q.modinv(&p).ok_or_else(|| {
             RsaError::new(
-                RsaErrorKind::RsaOptionsError,
+                RsaErrorKind::OptionsError,
                 format!(
                     "Unable to compute modular inverse of {} with respect to {}.",
                     q, p

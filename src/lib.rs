@@ -1,9 +1,10 @@
 pub mod crypto;
 pub mod errors;
 pub mod keygen;
+mod mask;
 pub mod serial;
 mod static_init;
-mod util;
+pub mod util;
 
 #[cfg(test)]
 mod test {
@@ -26,6 +27,12 @@ mod test {
                 .create_keypair()
                 .unwrap()
         })
+    }
+
+    #[test]
+    fn print_tests() {
+        let kp = create_keypair_with_timing();
+        println!("{}", kp.public_key.public_exponent);
     }
 
     #[test]
