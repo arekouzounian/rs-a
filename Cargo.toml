@@ -9,3 +9,12 @@ num = "0.4.3"
 num-bigint = { version = "0.4.3", features=["rand"]}
 rand = { version = "0.8.5", features=["getrandom"] }
 rand_chacha = "0.3.1"
+sha2 = "0.10.8"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "prime_gen_bench"
+harness = false
+html_reports = true
