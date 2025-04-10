@@ -30,12 +30,6 @@ mod test {
     }
 
     #[test]
-    fn print_tests() {
-        let kp = create_keypair_with_timing();
-        println!("{}", kp.public_key.public_exponent);
-    }
-
-    #[test]
     fn generate_rsa_keypair_seeded() {
         const SEED: u64 = 100;
 
