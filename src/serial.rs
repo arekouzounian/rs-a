@@ -26,12 +26,10 @@ pub enum AsnDerValues {
 pub fn read_openssh_public_key(path: &std::path::Path) -> Result<RsaPublicKey, Box<dyn Error>> {
     let file_contents = std::fs::read_to_string(path)?;
 
-    let b64: &str = file_contents.split_whitespace().nth(1).ok_or_else(|| {
-        RsaError::new(
-            RsaErrorKind::RsaSerialError,
-            String::from("invalid ssh key"),
-        )
-    })?;
+    let b64: &str = file_contents
+        .split_whitespace()
+        .nth(1)
+        .ok_or_else(|| RsaError::new(RsaErrorKind::SerialError, String::from("invalid ssh key")))?;
 
     let decode = BASE64_STANDARD.decode(b64)?;
 
@@ -123,7 +121,7 @@ fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigUint, BigUint), Box<dyn Error>> 
 
     if found_nums.len() != 3 {
         return Err(Box::new(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             String::from("invalid ssh public key format"),
         )));
     }
@@ -213,7 +211,7 @@ pub fn rsa_private_key_der_deserialize(data: Vec<u8>) -> Result<RsaPrivateKey, R
     let version = decode_der_int(&mut data)?;
     if version != BigUint::ZERO {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!("Unsupported RSA version: expected 0, actual {}", version),
         ));
     }
@@ -251,7 +249,7 @@ fn encode_der_len(mut len: usize) -> VecDeque<u8> {
 fn decode_der_len(data: &mut VecDeque<u8>) -> Result<usize, RsaError> {
     if data.len() < 2 {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             String::from("Invalid input length: must have at least 2 bytes"),
         ));
     }
@@ -265,12 +263,12 @@ fn decode_der_len(data: &mut VecDeque<u8>) -> Result<usize, RsaError> {
 
     if data.len() < num_len_bytes {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!("Invalid input length: needed 2, have {}", data.len()),
         ));
     } else if num_len_bytes > SUPPORTED_DER_LEN_SIZE {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!(
                 "Size not supported: maximum width of a DER object's length is {} bytes",
                 SUPPORTED_DER_LEN_SIZE
@@ -310,14 +308,14 @@ fn encode_der_int(int: &BigUint) -> VecDeque<u8> {
 fn decode_der_seq(data: &mut VecDeque<u8>) -> Result<(), RsaError> {
     if data.len() < 2 {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!("Invalid input length: needed 2, have {}", data.len()),
         ));
     }
 
     if data.pop_front().unwrap() != AsnDerValues::Asn1Seq as u8 {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             String::from("Invalid input: doesn't contain SEQ byte"),
         ));
     }
@@ -326,7 +324,7 @@ fn decode_der_seq(data: &mut VecDeque<u8>) -> Result<(), RsaError> {
 
     if data.len() < len {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!(
                 "Invalid input: sequence length {}, actual {}",
                 len,
@@ -341,7 +339,7 @@ fn decode_der_seq(data: &mut VecDeque<u8>) -> Result<(), RsaError> {
 fn decode_der_int(data: &mut VecDeque<u8>) -> Result<BigUint, RsaError> {
     if data.len() < 2 {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!("Invalid int width: needed 2, has {}", data.len()),
         ));
     }
@@ -349,7 +347,7 @@ fn decode_der_int(data: &mut VecDeque<u8>) -> Result<BigUint, RsaError> {
     let first = data.pop_front().unwrap();
     if first != AsnDerValues::Asn1Int as u8 {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!(
                 "Invalid integer DER tag: tag {}, actual {}",
                 AsnDerValues::Asn1Int as u8,
@@ -362,7 +360,7 @@ fn decode_der_int(data: &mut VecDeque<u8>) -> Result<BigUint, RsaError> {
 
     if data.len() < len {
         return Err(RsaError::new(
-            RsaErrorKind::RsaSerialError,
+            RsaErrorKind::SerialError,
             format!("Invalid input: length {}, actual {}", len, data.len()),
         ));
     }

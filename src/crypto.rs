@@ -17,18 +17,33 @@ pub trait RsaPrimitive {
     /// The integer must be within the range \[0, n-1\] (where n is the RSA modulus),
     /// or else the operation fails, and returns an `RsaCryptographyError`.
     fn crypt(&self, message: &BigUint) -> Result<BigUint, RsaError>;
+
+    fn crypt_with_bytes(&self, message: &[u8]) -> Result<Vec<u8>, RsaError>;
+}
+
+pub trait RsaOaepEncrypt {
+    fn encrypt(
+        &self,
+        message: impl AsRef<[u8]>,
+        label: Option<impl AsRef<[u8]>>,
+    ) -> Result<Vec<u8>, RsaError>;
 }
 
 impl RsaPrimitive for RsaPublicKey {
     fn crypt(&self, message: &BigUint) -> Result<BigUint, RsaError> {
         if message >= &self.modulus {
             return Err(RsaError::new(
-                RsaErrorKind::RsaCryptographyError,
+                RsaErrorKind::CryptographyError,
                 String::from("message representative out of range"),
             ));
         }
 
         Ok(message.modpow(&self.public_exponent, &self.modulus))
+    }
+
+    fn crypt_with_bytes(&self, message: &[u8]) -> Result<Vec<u8>, RsaError> {
+        let res = self.crypt(&BigUint::from_bytes_le(&message))?;
+        Ok(res.to_bytes_le())
     }
 }
 
@@ -36,7 +51,7 @@ impl RsaPrimitive for RsaPrivateKey {
     fn crypt(&self, ciphertext: &BigUint) -> Result<BigUint, RsaError> {
         if ciphertext >= &self.modulus {
             return Err(RsaError::new(
-                RsaErrorKind::RsaCryptographyError,
+                RsaErrorKind::CryptographyError,
                 String::from("ciphertext representative out of range"),
             ));
         }
@@ -56,5 +71,10 @@ impl RsaPrimitive for RsaPrivateKey {
         // let h = (diff * &self.coefficient) % &self.prime1;
 
         Ok(m_2 + &self.prime2 * h)
+    }
+
+    fn crypt_with_bytes(&self, message: &[u8]) -> Result<Vec<u8>, RsaError> {
+        let res = self.crypt(&BigUint::from_bytes_le(&message))?;
+        Ok(res.to_bytes_le())
     }
 }
