@@ -6,8 +6,11 @@
 
 use crate::errors::{RsaError, RsaErrorKind};
 use crate::keygen::{RsaPrivateKey, RsaPublicKey};
+
 use base64::prelude::*;
-use num::BigUint;
+use num::BigInt;
+use num_bigint::Sign;
+
 use std::collections::VecDeque;
 use std::error::Error;
 
@@ -83,7 +86,7 @@ pub fn pem_privatekey_encode(data: Vec<u8>) -> String {
 // pub fn pkcs_8_decode()
 
 /// Returns (exponent, modulus)
-fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigUint, BigUint), Box<dyn Error>> {
+fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigInt, BigInt), Box<dyn Error>> {
     let mut ind: usize = 0;
 
     let next_four_bytes_as_u32 = |i: &mut usize| {
@@ -103,7 +106,7 @@ fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigUint, BigUint), Box<dyn Error>> 
 
     let mut len = next_four_bytes_as_u32(&mut ind);
 
-    let mut found_nums: Vec<BigUint> = Vec::with_capacity(3);
+    let mut found_nums: Vec<BigInt> = Vec::with_capacity(3);
 
     while len.is_some() {
         let l = len.unwrap() as usize;
@@ -111,7 +114,7 @@ fn parse_pub_key(bytes: &Vec<u8>) -> Result<(BigUint, BigUint), Box<dyn Error>> 
             break;
         }
 
-        let data = BigUint::from_bytes_le(&bytes[ind..ind + l]);
+        let data = BigInt::from_bytes_le(Sign::Plus, &bytes[ind..ind + l]);
 
         found_nums.push(data);
 
@@ -155,7 +158,7 @@ pub fn rsa_public_key_der_serialize(key: RsaPublicKey) -> Vec<u8> {
 }
 
 pub fn rsa_private_key_der_serialize(key: RsaPrivateKey) -> Vec<u8> {
-    let version_bytes = encode_der_int(&BigUint::ZERO);
+    let version_bytes = encode_der_int(&BigInt::ZERO);
     let mod_bytes = encode_der_int(&key.modulus);
     let exp_bytes = encode_der_int(&key.public_exponent);
     let d_bytes = encode_der_int(&key.private_exponent);
@@ -209,7 +212,7 @@ pub fn rsa_private_key_der_deserialize(data: Vec<u8>) -> Result<RsaPrivateKey, R
     decode_der_seq(&mut data)?;
 
     let version = decode_der_int(&mut data)?;
-    if version != BigUint::ZERO {
+    if version != BigInt::ZERO {
         return Err(RsaError::new(
             RsaErrorKind::SerialError,
             format!("Unsupported RSA version: expected 0, actual {}", version),
@@ -288,8 +291,8 @@ fn decode_der_len(data: &mut VecDeque<u8>) -> Result<usize, RsaError> {
     Ok(ret)
 }
 
-fn encode_der_int(int: &BigUint) -> VecDeque<u8> {
-    let mut bytes = VecDeque::from(int.to_bytes_be());
+fn encode_der_int(int: &BigInt) -> VecDeque<u8> {
+    let mut bytes = VecDeque::from(int.to_bytes_be().1);
 
     // If it has a first order bit set, we need to add a 0 byte to the front
     if bytes[0] & 0x80 != 0 {
@@ -336,7 +339,7 @@ fn decode_der_seq(data: &mut VecDeque<u8>) -> Result<(), RsaError> {
     Ok(())
 }
 
-fn decode_der_int(data: &mut VecDeque<u8>) -> Result<BigUint, RsaError> {
+fn decode_der_int(data: &mut VecDeque<u8>) -> Result<BigInt, RsaError> {
     if data.len() < 2 {
         return Err(RsaError::new(
             RsaErrorKind::SerialError,
@@ -377,5 +380,5 @@ fn decode_der_int(data: &mut VecDeque<u8>) -> Result<BigUint, RsaError> {
         bytes.push(data.pop_front().unwrap());
     }
 
-    Ok(BigUint::from_bytes_be(&bytes))
+    Ok(BigInt::from_bytes_be(Sign::Plus, &bytes))
 }

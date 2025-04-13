@@ -5,7 +5,7 @@
 //! object, which has various chainable methods one can use to specify various parameters during
 //! key generation.
 
-use num::{BigUint, Integer};
+use num::{BigInt, Integer};
 use num_bigint::RandBigInt;
 use rand::{rngs::StdRng, CryptoRng, SeedableRng};
 
@@ -35,14 +35,14 @@ pub struct KeyPairBuilder {
     /// An optionally specified public exponent. A commonly chosen exponent for RSA is 65537.
     ///
     /// If `None` is provided, one will be calculated using the `rng` also defined in this struct.
-    exponent: Option<BigUint>,
+    exponent: Option<BigInt>,
 
     /// An optionally specified RSA modulus, which is defined as a tuple of two primes `p, q`.
     ///
     /// If `None` is provided, these primes will be generated using the `rng`,
     /// the given `prime_generation_method`, and the number of `miller_rabin_iterations`
     /// also defined in this struct.
-    modulus: Option<(BigUint, BigUint)>,
+    modulus: Option<(BigInt, BigInt)>,
 
     /// An optionally specified [CSPRNG](https://en.wikipedia.org/wiki/Cryptographically_secure_pseudorandom_number_generator).
     ///
@@ -68,11 +68,11 @@ impl Default for KeyPairBuilder {
 }
 
 impl KeyPairBuilder {
-    pub fn with_exponent(&mut self, e: BigUint) -> &mut Self {
+    pub fn with_exponent(&mut self, e: BigInt) -> &mut Self {
         self.exponent = Some(e);
         self
     }
-    pub fn with_modulus(&mut self, p: BigUint, q: BigUint) -> &mut Self {
+    pub fn with_modulus(&mut self, p: BigInt, q: BigInt) -> &mut Self {
         self.modulus = Some((p, q));
         self
     }
@@ -104,9 +104,9 @@ impl KeyPairBuilder {
         let exponent = self.exponent.take().unwrap_or_else(|| {
             // compute carmichael totient = lambda
             // look for values of e that are coprime to lambda
-            let three = BigUint::ZERO + 3u32;
-            let one = BigUint::ZERO + 1u32;
-            let mut e = rng.gen_biguint_range(&three, &lambda);
+            let three = BigInt::ZERO + 3u32;
+            let one = BigInt::ZERO + 1u32;
+            let mut e = rng.gen_bigint_range(&three, &lambda);
 
             // pick a random spot, look locally till we find something coprime to lambda
             // if we reach lambda then start over
@@ -115,7 +115,7 @@ impl KeyPairBuilder {
                 e.inc();
 
                 if e == lambda {
-                    e = rng.gen_biguint_range(&three, &lambda);
+                    e = rng.gen_bigint_range(&three, &lambda);
                 }
             }
 
@@ -152,26 +152,26 @@ pub struct KeyPair {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RsaPublicKey {
-    pub modulus: BigUint,
-    pub public_exponent: BigUint,
+    pub modulus: BigInt,
+    pub public_exponent: BigInt,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 /// [See source](https://datatracker.ietf.org/doc/html/rfc3447#appendix-A)
 pub struct RsaPrivateKey {
     pub version: u8,
-    pub modulus: BigUint,
-    pub public_exponent: BigUint,
-    pub private_exponent: BigUint,
-    pub prime1: BigUint,
-    pub prime2: BigUint,
-    pub exponent1: BigUint,
-    pub exponent2: BigUint,
-    pub coefficient: BigUint,
+    pub modulus: BigInt,
+    pub public_exponent: BigInt,
+    pub private_exponent: BigInt,
+    pub prime1: BigInt,
+    pub prime2: BigInt,
+    pub exponent1: BigInt,
+    pub exponent2: BigInt,
+    pub coefficient: BigInt,
 }
 
 impl RsaPublicKey {
-    pub fn new(e: BigUint, n: BigUint) -> Self {
+    pub fn new(e: BigInt, n: BigInt) -> Self {
         Self {
             public_exponent: e,
             modulus: n,
@@ -182,14 +182,14 @@ impl RsaPublicKey {
 impl RsaPrivateKey {
     pub fn new(
         version: u8,
-        modulus: BigUint,
-        public_exponent: BigUint,
-        private_exponent: BigUint,
-        prime1: BigUint,
-        prime2: BigUint,
-        exponent1: BigUint,
-        exponent2: BigUint,
-        coefficient: BigUint,
+        modulus: BigInt,
+        public_exponent: BigInt,
+        private_exponent: BigInt,
+        prime1: BigInt,
+        prime2: BigInt,
+        exponent1: BigInt,
+        exponent2: BigInt,
+        coefficient: BigInt,
     ) -> Self {
         Self {
             version,
@@ -205,11 +205,11 @@ impl RsaPrivateKey {
     }
 
     fn with_values(
-        n: BigUint,
-        e: BigUint,
-        d: BigUint,
-        p: BigUint,
-        q: BigUint,
+        n: BigInt,
+        e: BigInt,
+        d: BigInt,
+        p: BigInt,
+        q: BigInt,
     ) -> Result<Self, RsaError> {
         let p1 = &p - 1u32;
         let q1 = &q - 1u32;

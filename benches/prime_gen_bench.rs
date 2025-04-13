@@ -6,7 +6,7 @@ use rs_a::{
     util::{carmichael_totient, generate_candidate_prime, miller_rabin_is_prime},
 };
 
-use num::{BigUint, Integer};
+use num::{BigInt, Integer};
 
 const MILLER_RABIN_ITERATIONS: usize = 10;
 
@@ -28,7 +28,7 @@ pub fn candidate_prime_benchmark(c: &mut Criterion) {
 pub fn miller_rabin_benchmark(c: &mut Criterion) {
     const PRIMES: usize = 10;
     let mut rng: Box<dyn RsaCsprng> = Box::new(StdRng::from_entropy());
-    let mut candidates = Vec::<BigUint>::with_capacity(PRIMES);
+    let mut candidates = Vec::<BigInt>::with_capacity(PRIMES);
     let mut group = c.benchmark_group("miller_rabin");
 
     for _ in 0..PRIMES {
@@ -69,28 +69,28 @@ pub fn exponent_benchmark(c: &mut Criterion) {
 
     let lambda = carmichael_totient(&p, &q);
 
-    let three = BigUint::ZERO + 3u32;
-    let one = BigUint::ZERO + 1u32;
+    let three = BigInt::ZERO + 3u32;
+    let one = BigInt::ZERO + 1u32;
 
     group.bench_function("compute public exponent", |b| {
         b.iter(|| {
-            let mut e = rng.gen_biguint_range(&three, &lambda);
+            let mut e = rng.gen_bigint_range(&three, &lambda);
             while e.gcd(&lambda) != one {
                 e.inc();
 
                 if e == lambda {
-                    e = rng.gen_biguint_range(&three, &lambda);
+                    e = rng.gen_bigint_range(&three, &lambda);
                 }
             }
         })
     });
 
-    let mut e = rng.gen_biguint_range(&three, &lambda);
+    let mut e = rng.gen_bigint_range(&three, &lambda);
     while e.gcd(&lambda) != one {
         e.inc();
 
         if e == lambda {
-            e = rng.gen_biguint_range(&three, &lambda);
+            e = rng.gen_bigint_range(&three, &lambda);
         }
     }
 

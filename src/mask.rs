@@ -20,7 +20,6 @@ pub fn mgf(hash_type: HashType, seed: u32, output_len: u32) -> Result<Vec<u8>, R
     }
 
     let mut t: Vec<u8> = Vec::new();
-    // let cast_seed = BigUint::from_u32(seed).unwrap();
     let mut seed = Vec::from(seed.to_le_bytes());
 
     for i in 0..div_ceil(output_len, hash_len) {

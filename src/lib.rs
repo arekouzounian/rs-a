@@ -11,7 +11,7 @@ mod test {
     use crate::crypto::*;
     use crate::keygen::*;
     use crate::serial::*;
-    use num::{BigUint, One};
+    use num::{BigInt, One};
     use num_bigint::RandBigInt;
     use rand::rngs::StdRng;
     use rand::SeedableRng;
@@ -53,7 +53,7 @@ mod test {
         assert_eq!(&pk.public_exponent, &sk.public_exponent);
         assert_eq!(&pk.modulus, &sk.modulus);
 
-        let one = BigUint::ZERO + 1u32;
+        let one = BigInt::ZERO + 1u32;
 
         assert_eq!((&pk.public_exponent * &sk.exponent1) % &p1, one);
         assert_eq!((&pk.public_exponent * &sk.exponent2) % &q1, one);
@@ -65,7 +65,7 @@ mod test {
 
         let mut rng = StdRng::from_entropy();
 
-        let m = rng.gen_biguint_range(&BigUint::one(), &kp.private_key.modulus);
+        let m = rng.gen_bigint_range(&BigInt::one(), &kp.private_key.modulus);
 
         let cipher_res = kp.public_key.crypt(&m);
         assert!(cipher_res.is_ok());

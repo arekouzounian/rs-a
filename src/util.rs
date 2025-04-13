@@ -1,5 +1,5 @@
 //! Utility functions
-use num::{BigUint, Integer, ToPrimitive};
+use num::{BigInt, Integer, ToPrimitive};
 
 use crate::keygen::{RsaCsprng, RSA_PRIME_NUMBER_BIT_LENGTH};
 use crate::static_init::{PRECOMPUTED_PRIMES, PRECOMPUTED_PRIMES_LEN};
@@ -10,24 +10,24 @@ use crate::static_init::{PRECOMPUTED_PRIMES, PRECOMPUTED_PRIMES_LEN};
 /// `rng`: The CSPRNG used to generate primes
 ///
 /// `mr_iterations`: The number of miller-rabin primality test iterations to conduct, default 1.
-pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
+pub fn generate_candidate_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigInt {
     probable_prime(rng, mr_iterations)
 }
 
 /// Replicating the probable_prime() generation from OpenSSL
 /// [See Source](https://github.com/openssl/openssl/blob/4a4505cc645d2e862e368e2823e921a564112ca2/crypto/bn/bn_prime.c#L487)
-fn probable_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint {
-    let mut mods: [u64; PRECOMPUTED_PRIMES_LEN] = [0; 512];
-    const MAX_DELTA: u64 = u64::MAX - PRECOMPUTED_PRIMES[PRECOMPUTED_PRIMES_LEN - 1];
+fn probable_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigInt {
+    let mut mods: [i64; PRECOMPUTED_PRIMES_LEN] = [0; 512];
+    const MAX_DELTA: i64 = i64::MAX - PRECOMPUTED_PRIMES[PRECOMPUTED_PRIMES_LEN - 1];
 
     'full_gen: loop {
-        let mut candidate = generate_random_odd_big_uint(rng);
+        let mut candidate = generate_random_odd_big_int(rng);
 
         for i in 1..PRECOMPUTED_PRIMES_LEN {
-            mods[i] = (&candidate % PRECOMPUTED_PRIMES[i]).to_u64().unwrap();
+            mods[i] = (&candidate % PRECOMPUTED_PRIMES[i]).to_i64().unwrap();
         }
 
-        let mut delta: u64 = 0;
+        let mut delta: i64 = 0;
 
         'check_mods: loop {
             for i in 1..PRECOMPUTED_PRIMES_LEN {
@@ -57,37 +57,23 @@ fn probable_prime(rng: &mut Box<dyn RsaCsprng>, mr_iterations: usize) -> BigUint
 
 /// Generates a large, odd integer.
 /// Top 2 bits are always set
-fn generate_random_odd_big_uint(rng: &mut Box<dyn RsaCsprng>) -> BigUint {
-    let mut x = rng.gen_biguint(RSA_PRIME_NUMBER_BIT_LENGTH);
+fn generate_random_odd_big_int(rng: &mut Box<dyn RsaCsprng>) -> BigInt {
+    let mut x = rng.gen_bigint(RSA_PRIME_NUMBER_BIT_LENGTH);
 
     if x.is_even() {
         x.dec()
     }
 
-    let num_bits = x.bits();
-    x.set_bit(num_bits, true);
-    x.set_bit(num_bits - 1, true);
+    if x < BigInt::ZERO {
+        x *= -1;
+    }
 
     x
 }
 
-/// Returns true if the prime candidate passes the prime sieve
-/// primes are defined in static_init
-///
-/// Deprecated. Functionality moved into `probable_prime()`.
-fn _small_prime_sieve(prime_candidate: &BigUint) -> bool {
-    for i in 1..PRECOMPUTED_PRIMES_LEN {
-        if prime_candidate % PRECOMPUTED_PRIMES[i] == BigUint::ZERO {
-            return false;
-        }
-    }
-
-    true
-}
-
 /// Computes the Carmichael Totient function `lambda(n)` for a given two-prime RSA modulus,
 /// represented by primes `p, q`.
-pub fn carmichael_totient(p: &BigUint, q: &BigUint) -> BigUint {
+pub fn carmichael_totient(p: &BigInt, q: &BigInt) -> BigInt {
     (p - 1u32).lcm(&(q - 1u32))
 }
 
@@ -98,30 +84,31 @@ pub fn carmichael_totient(p: &BigUint, q: &BigUint) -> BigUint {
 /// where r is an odd integer.
 pub fn miller_rabin_is_prime(
     rng: &mut Box<dyn RsaCsprng>,
-    prime_candidate: &BigUint,
+    prime_candidate: &BigInt,
     iterations: usize,
 ) -> bool {
-    let two = BigUint::ZERO + 2u32;
-    let one = BigUint::ZERO + 1u32;
+    let two = BigInt::ZERO + 2u32;
+    let one = BigInt::ZERO + 1u32;
 
-    if prime_candidate.eq(&BigUint::ZERO) {
+    if prime_candidate.eq(&BigInt::ZERO) {
         return false;
     }
 
     // if the prime candidate is even or 2 then we don't want to count it.
-    if prime_candidate.eq(&two) || prime_candidate.modpow(&one, &two) == BigUint::ZERO {
+    if prime_candidate.eq(&two) || prime_candidate.modpow(&one, &two) == BigInt::ZERO {
         return false;
     }
 
     let p_minus_one = prime_candidate - 1u32;
 
     let u = p_minus_one.trailing_zeros().unwrap() as u32;
+
     let r = &p_minus_one >> u;
 
-    assert!(p_minus_one == (two.pow(u) * &r));
+    debug_assert_eq!(p_minus_one, (two.pow(u) * &r));
 
     'outer: for _ in 0..iterations {
-        let a = rng.gen_biguint_range(&two, &p_minus_one);
+        let a = rng.gen_bigint_range(&two, &p_minus_one);
 
         let mut z = a.modpow(&r, &prime_candidate);
 
@@ -139,34 +126,6 @@ pub fn miller_rabin_is_prime(
         }
 
         return false;
-    }
-
-    true
-}
-
-/// `a`: potential witness \
-/// `p`: prime candidate \
-/// `r, u`: values such that `p - 1` = `2^u * r` \
-/// Returns true if a is a valid witness, false otherwise
-///
-/// Deprecated. Functionality moved into `miller_rabin_is_prime.`
-fn _test_witness(a: &BigUint, p: &BigUint, u: &u32, r: &BigUint) -> bool {
-    let mut z: BigUint = a.modpow(r, p);
-
-    let two: BigUint = BigUint::ZERO + 2u32;
-    let p_minus_one: BigUint = p - 1u32;
-
-    if (&z - 1u32) == BigUint::ZERO {
-        return false;
-    }
-
-    for i in 0..*u {
-        let exp = two.pow(i) * r;
-        z = z.modpow(&exp, p);
-
-        if z == p_minus_one {
-            return false;
-        }
     }
 
     true
