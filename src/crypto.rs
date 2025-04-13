@@ -59,16 +59,7 @@ impl RsaPrimitive for RsaPrivateKey {
         let m_1 = ciphertext.modpow(&self.exponent1, &self.prime1);
         let m_2 = ciphertext.modpow(&self.exponent2, &self.prime2);
 
-        // let diff = if m_1 > m_2 { &m_1 - &m_2 } else { &m_2 - &m_1 };
-
-        let h: BigUint;
-        if m_1 > m_2 {
-            h = ((&m_1 - &m_2) * &self.coefficient) % &self.prime1;
-        } else {
-            h = &self.prime1 - (((&m_2 - &m_1) * &self.coefficient) % &self.prime1);
-        }
-
-        // let h = (diff * &self.coefficient) % &self.prime1;
+        let h = ((&m_1 - &m_2) * &self.coefficient) % &self.prime1;
 
         Ok(m_2 + &self.prime2 * h)
     }
