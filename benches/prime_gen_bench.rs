@@ -2,11 +2,13 @@ use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 use rand::{rngs::StdRng, SeedableRng};
 use rs_a::{
+    crypto::RsaPrimitive,
     keygen::{KeyPairBuilder, RsaCsprng},
     util::{carmichael_totient, generate_candidate_prime, miller_rabin_is_prime},
 };
 
 use num::{BigUint, Integer};
+use num_bigint::RandBigInt;
 
 const MILLER_RABIN_ITERATIONS: usize = 10;
 
@@ -54,6 +56,48 @@ pub fn keypair_builder_benchmark(c: &mut Criterion) {
             KeyPairBuilder::default()
                 .with_iterations(MILLER_RABIN_ITERATIONS)
                 .create_keypair()
+        })
+    });
+}
+
+pub fn encryption_decryption_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("encryption & decryption primitives");
+
+    let kp = KeyPairBuilder::default().create_keypair().unwrap();
+    let mut rng = StdRng::from_entropy();
+
+    const BIT_SIZE: u64 = 1024;
+
+    group.bench_function("encryption primitive", |b| {
+        b.iter(|| {
+            let m = rng.gen_biguint(BIT_SIZE);
+            black_box(&kp.public_key.crypt(&m).unwrap());
+        })
+    });
+
+    group.bench_function("decryption primitive (CRT)", |b| {
+        b.iter(|| {
+            let m = rng.gen_biguint(BIT_SIZE);
+
+            black_box(&kp.private_key.crypt(&m).unwrap());
+        })
+    });
+
+    group.bench_function("decryption primitive (exponent)", |b| {
+        b.iter(|| {
+            let m = rng.gen_biguint(BIT_SIZE);
+            black_box(m.modpow(&kp.private_key.private_exponent, &kp.private_key.modulus))
+        })
+    });
+
+    group.bench_function("encrypt decrypt", |b| {
+        b.iter(|| {
+            let m = rng.gen_biguint(BIT_SIZE);
+
+            let e = &kp.public_key.crypt(&m).unwrap();
+            let d = &kp.private_key.crypt(&e).unwrap();
+
+            assert_eq!(*d, m);
         })
     });
 }
@@ -106,7 +150,8 @@ pub fn exponent_benchmark(c: &mut Criterion) {
 // [See Docs](https://bheisler.github.io/criterion.rs/book/user_guide/advanced_configuration.html)
 criterion_group! {
     name = benches;
-    config = Criterion::default().sample_size(500);
-    targets = candidate_prime_benchmark, miller_rabin_benchmark, keypair_builder_benchmark, exponent_benchmark
+    config = Criterion::default().sample_size(250);
+    // targets = candidate_prime_benchmark, miller_rabin_benchmark, keypair_builder_benchmark, exponent_benchmark, encryption_decryption_bench
+    targets = encryption_decryption_bench
 }
 criterion_main!(benches);

@@ -2,6 +2,7 @@
 //! This module handles cryptographic primitives, as well as
 //! the associated encryption/decryption operations.
 
+// might want to switch to crypto-bigint for faster modular operations
 use num::BigUint;
 
 use crate::{
@@ -56,10 +57,17 @@ impl RsaPrimitive for RsaPrivateKey {
             ));
         }
 
-        let m_1 = ciphertext.modpow(&self.exponent1, &self.prime1);
+        // m_1 = c^dP mod p
+        // m_2 = c^dQ mod q
+        let mut m_1 = ciphertext.modpow(&self.exponent1, &self.prime1);
         let m_2 = ciphertext.modpow(&self.exponent2, &self.prime2);
 
-        let h = ((&m_1 - &m_2) * &self.coefficient) % &self.prime1;
+        // m_1 - m_2 mod p = m_1 mod p - m_2 mod p
+
+        let m_2r = &m_2 % &self.prime1;
+        m_1 = (m_1 + &self.prime1 - &m_2r) % &self.prime1;
+
+        let h = (m_1 * &self.coefficient) % &self.prime1;
 
         Ok(m_2 + &self.prime2 * h)
     }
