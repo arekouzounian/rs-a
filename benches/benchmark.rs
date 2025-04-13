@@ -151,7 +151,7 @@ pub fn exponent_benchmark(c: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default().sample_size(250);
-    // targets = candidate_prime_benchmark, miller_rabin_benchmark, keypair_builder_benchmark, exponent_benchmark, encryption_decryption_bench
-    targets = encryption_decryption_bench
+    targets = candidate_prime_benchmark, miller_rabin_benchmark, keypair_builder_benchmark, exponent_benchmark, encryption_decryption_bench
+    // targets = encryption_decryption_bench
 }
 criterion_main!(benches);
