@@ -35,14 +35,12 @@ mod test {
 
         let rng = Box::new(StdRng::seed_from_u64(SEED));
 
-        let options = KeyPairBuilder::default()
+        let kp = KeyPairBuilder::default()
             .with_rng(rng)
             .with_iterations(10)
             .create_keypair()
-            .inspect_err(|err| println!("{}", err));
+            .expect("fatal error: couldn't generate keypair");
 
-        assert!(options.is_ok());
-        let kp = options.unwrap();
 
         let pk = kp.public_key;
         let sk = kp.private_key;
